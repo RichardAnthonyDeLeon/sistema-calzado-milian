@@ -1,0 +1,25 @@
+# Dependencias
+node_modules/
+**/node_modules/
+
+# Variables de entorno y credenciales
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+
+# Archivos generados
+dist/
+build/
+coverage/
+.vite/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Archivos temporales
+.DS_Store
+Thumbs.db

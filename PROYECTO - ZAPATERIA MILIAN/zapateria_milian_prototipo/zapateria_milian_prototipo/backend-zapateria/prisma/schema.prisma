@@ -1,0 +1,577 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model tbl_abonos {
+  id_abono           BigInt              @id @default(autoincrement()) @db.UnsignedBigInt
+  id_credito         BigInt              @db.UnsignedBigInt
+  id_cuota           BigInt?             @db.UnsignedBigInt
+  id_usuario         Int                 @db.UnsignedInt
+  fecha_abono        DateTime            @default(now()) @db.DateTime(0)
+  monto              Decimal             @db.Decimal(14, 2)
+  observaciones      String?             @db.VarChar(500)
+  tbl_creditos       tbl_creditos        @relation(fields: [id_credito], references: [id_credito], map: "fk_abonos_creditos")
+  tbl_cuotas_credito tbl_cuotas_credito? @relation(fields: [id_cuota], references: [id_cuota], onDelete: Restrict, map: "fk_abonos_cuotas")
+  tbl_usuarios       tbl_usuarios        @relation(fields: [id_usuario], references: [id_usuario], map: "fk_abonos_usuarios")
+
+  @@index([id_credito], map: "fk_abonos_creditos")
+  @@index([id_cuota], map: "fk_abonos_cuotas")
+  @@index([id_usuario], map: "fk_abonos_usuarios")
+}
+
+model tbl_bitacora {
+  id_bitacora  BigInt        @id @default(autoincrement()) @db.UnsignedBigInt
+  id_usuario   Int?          @db.UnsignedInt
+  accion       String        @db.VarChar(100)
+  modulo       String        @db.VarChar(80)
+  descripcion  String?       @db.VarChar(1000)
+  fecha_hora   DateTime      @default(now()) @db.DateTime(0)
+  tbl_usuarios tbl_usuarios? @relation(fields: [id_usuario], references: [id_usuario], map: "fk_bitacora_usuarios")
+
+  @@index([id_usuario], map: "fk_bitacora_usuarios")
+  @@index([fecha_hora], map: "idx_bitacora_fecha")
+  @@index([modulo], map: "idx_bitacora_modulo")
+}
+
+model tbl_clientes {
+  id_cliente     Int                 @id @default(autoincrement()) @db.UnsignedInt
+  nombre         String              @db.VarChar(150)
+  telefono       String?             @db.VarChar(25)
+  correo         String?             @db.VarChar(150)
+  nit            String?             @db.VarChar(25)
+  direccion      String?             @db.VarChar(255)
+  observaciones  String?             @db.VarChar(500)
+  estado         tbl_clientes_estado @default(ACTIVO)
+  fecha_registro DateTime            @default(now()) @db.DateTime(0)
+  tbl_creditos   tbl_creditos[]
+  tbl_pedidos    tbl_pedidos[]
+  tbl_ventas     tbl_ventas[]
+}
+
+model tbl_compras {
+  id_compra          BigInt               @id @default(autoincrement()) @db.UnsignedBigInt
+  id_proveedor       Int                  @db.UnsignedInt
+  id_usuario         Int                  @db.UnsignedInt
+  fecha_compra       DateTime             @default(now()) @db.DateTime(0)
+  fecha_recepcion    DateTime?            @db.DateTime(0)
+  total_compra       Decimal              @default(0.00) @db.Decimal(14, 2)
+  observaciones      String?              @db.VarChar(500)
+  estado             tbl_compras_estado   @default(PENDIENTE)
+  tbl_proveedores    tbl_proveedores      @relation(fields: [id_proveedor], references: [id_proveedor], map: "fk_compras_proveedores")
+  tbl_usuarios       tbl_usuarios         @relation(fields: [id_usuario], references: [id_usuario], map: "fk_compras_usuarios")
+  tbl_detalle_compra tbl_detalle_compra[]
+
+  @@index([id_proveedor], map: "fk_compras_proveedores")
+  @@index([id_usuario], map: "fk_compras_usuarios")
+  @@index([fecha_compra], map: "idx_compras_fecha")
+  @@index([estado], map: "idx_compras_estado")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model tbl_creditos {
+  id_credito         BigInt               @id @default(autoincrement()) @db.UnsignedBigInt
+  id_venta           BigInt               @unique(map: "uq_creditos_venta") @db.UnsignedBigInt
+  id_cliente         Int                  @db.UnsignedInt
+  fecha_credito      DateTime             @default(now()) @db.DateTime(0)
+  monto_credito      Decimal              @db.Decimal(14, 2)
+  saldo_pendiente    Decimal              @db.Decimal(14, 2)
+  numero_cuotas      Int                  @db.UnsignedSmallInt
+  estado             tbl_creditos_estado  @default(ACTIVO)
+  tbl_abonos         tbl_abonos[]
+  tbl_clientes       tbl_clientes         @relation(fields: [id_cliente], references: [id_cliente], map: "fk_creditos_clientes")
+  tbl_ventas         tbl_ventas           @relation(fields: [id_venta], references: [id_venta], map: "fk_creditos_ventas")
+  tbl_cuotas_credito tbl_cuotas_credito[]
+
+  @@index([id_cliente], map: "fk_creditos_clientes")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model tbl_cuotas_credito {
+  id_cuota          BigInt                    @id @default(autoincrement()) @db.UnsignedBigInt
+  id_credito        BigInt                    @db.UnsignedBigInt
+  numero_cuota      Int                       @db.UnsignedSmallInt
+  monto_cuota       Decimal                   @db.Decimal(14, 2)
+  fecha_vencimiento DateTime                  @db.Date
+  estado            tbl_cuotas_credito_estado @default(PENDIENTE)
+  tbl_abonos        tbl_abonos[]
+  tbl_creditos      tbl_creditos              @relation(fields: [id_credito], references: [id_credito], map: "fk_cuotas_creditos")
+
+  @@unique([id_credito, numero_cuota], map: "uq_credito_numero_cuota")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model tbl_detalle_compra {
+  id_detalle_compra BigInt         @id @default(autoincrement()) @db.UnsignedBigInt
+  id_compra         BigInt         @db.UnsignedBigInt
+  id_material       Int            @db.UnsignedInt
+  cantidad          Decimal        @db.Decimal(14, 3)
+  precio_unitario   Decimal        @db.Decimal(12, 2)
+  subtotal          Decimal        @db.Decimal(14, 2)
+  tbl_compras       tbl_compras    @relation(fields: [id_compra], references: [id_compra], onDelete: Cascade, map: "fk_detalle_compra_compras")
+  tbl_materiales    tbl_materiales @relation(fields: [id_material], references: [id_material], map: "fk_detalle_compra_materiales")
+
+  @@unique([id_compra, id_material], map: "uq_detalle_compra_material")
+  @@index([id_material], map: "fk_detalle_compra_materiales")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model tbl_detalle_pedido {
+  id_detalle_pedido      BigInt                 @id @default(autoincrement()) @db.UnsignedBigInt
+  id_pedido              BigInt                 @db.UnsignedBigInt
+  id_variante            Int                    @db.UnsignedInt
+  descripcion_diseno     String?                @db.VarChar(1000)
+  cantidad               Int                    @db.UnsignedInt
+  precio_unitario        Decimal                @db.Decimal(12, 2)
+  subtotal               Decimal                @db.Decimal(14, 2)
+  tbl_pedidos            tbl_pedidos            @relation(fields: [id_pedido], references: [id_pedido], onDelete: Cascade, map: "fk_detalle_pedido_pedidos")
+  tbl_variantes_producto tbl_variantes_producto @relation(fields: [id_variante], references: [id_variante], map: "fk_detalle_pedido_variantes")
+  tbl_producciones       tbl_producciones?
+
+  @@index([id_pedido], map: "fk_detalle_pedido_pedidos")
+  @@index([id_variante], map: "fk_detalle_pedido_variantes")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model tbl_detalle_produccion_material {
+  id_detalle_material  BigInt               @id @default(autoincrement()) @db.UnsignedBigInt
+  id_lote              BigInt               @db.UnsignedBigInt
+  id_material          Int                  @db.UnsignedInt
+  cantidad_estimada    Decimal              @db.Decimal(14, 3)
+  cantidad_real        Decimal?             @db.Decimal(14, 3)
+  tbl_lotes_produccion tbl_lotes_produccion @relation(fields: [id_lote], references: [id_lote], map: "fk_detalle_produccion_lotes")
+  tbl_materiales       tbl_materiales       @relation(fields: [id_material], references: [id_material], map: "fk_detalle_produccion_materiales")
+
+  @@unique([id_lote, id_material], map: "uq_lote_material")
+  @@index([id_material], map: "fk_detalle_produccion_materiales")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model tbl_detalle_venta {
+  id_detalle_venta       BigInt                 @id @default(autoincrement()) @db.UnsignedBigInt
+  id_venta               BigInt                 @db.UnsignedBigInt
+  id_variante            Int                    @db.UnsignedInt
+  cantidad               Int                    @db.UnsignedInt
+  precio_unitario        Decimal                @db.Decimal(12, 2)
+  subtotal               Decimal                @db.Decimal(14, 2)
+  tbl_variantes_producto tbl_variantes_producto @relation(fields: [id_variante], references: [id_variante], map: "fk_detalle_venta_variantes")
+  tbl_ventas             tbl_ventas             @relation(fields: [id_venta], references: [id_venta], onDelete: Cascade, map: "fk_detalle_venta_ventas")
+
+  @@unique([id_venta, id_variante], map: "uq_detalle_venta_variante")
+  @@index([id_variante], map: "fk_detalle_venta_variantes")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model tbl_lotes_produccion {
+  id_lote                         BigInt                            @id @default(autoincrement()) @db.UnsignedBigInt
+  id_produccion                   BigInt                            @db.UnsignedBigInt
+  numero_lote                     String                            @db.VarChar(30)
+  cantidad                        Int                               @db.UnsignedInt
+  fecha_inicio                    DateTime?                         @db.DateTime(0)
+  fecha_finalizacion              DateTime?                         @db.DateTime(0)
+  estado                          tbl_lotes_produccion_estado       @default(PENDIENTE)
+  observaciones                   String?                           @db.VarChar(500)
+  tbl_detalle_produccion_material tbl_detalle_produccion_material[]
+  tbl_producciones                tbl_producciones                  @relation(fields: [id_produccion], references: [id_produccion], map: "fk_lotes_producciones")
+
+  @@unique([id_produccion, numero_lote], map: "uq_lote_produccion")
+}
+
+model tbl_materiales {
+  id_material                     Int                               @id @default(autoincrement()) @db.UnsignedInt
+  id_unidad                       Int                               @db.UnsignedInt
+  nombre                          String                            @unique(map: "uq_materiales_nombre") @db.VarChar(120)
+  descripcion                     String?                           @db.VarChar(255)
+  existencia_actual               Decimal                           @default(0.000) @db.Decimal(14, 3)
+  existencia_minima               Decimal                           @default(0.000) @db.Decimal(14, 3)
+  costo_referencia                Decimal                           @default(0.00) @db.Decimal(12, 2)
+  estado                          tbl_materiales_estado             @default(ACTIVO)
+  fecha_registro                  DateTime                          @default(now()) @db.DateTime(0)
+  tbl_detalle_compra              tbl_detalle_compra[]
+  tbl_detalle_produccion_material tbl_detalle_produccion_material[]
+  tbl_unidades_medida             tbl_unidades_medida               @relation(fields: [id_unidad], references: [id_unidad], map: "fk_materiales_unidades")
+  tbl_movimientos_material        tbl_movimientos_material[]
+  tbl_producto_material           tbl_producto_material[]
+
+  @@index([id_unidad], map: "fk_materiales_unidades")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model tbl_movimientos_material {
+  id_movimiento_material BigInt                                   @id @default(autoincrement()) @db.UnsignedBigInt
+  id_material            Int                                      @db.UnsignedInt
+  id_usuario             Int                                      @db.UnsignedInt
+  tipo_movimiento        tbl_movimientos_material_tipo_movimiento
+  cantidad               Decimal                                  @db.Decimal(14, 3)
+  fecha_movimiento       DateTime                                 @default(now()) @db.DateTime(0)
+  tipo_referencia        tbl_movimientos_material_tipo_referencia
+  id_referencia          BigInt?                                  @db.UnsignedBigInt
+  observaciones          String?                                  @db.VarChar(500)
+  tbl_materiales         tbl_materiales                           @relation(fields: [id_material], references: [id_material], map: "fk_mov_material_materiales")
+  tbl_usuarios           tbl_usuarios                             @relation(fields: [id_usuario], references: [id_usuario], map: "fk_mov_material_usuarios")
+
+  @@index([id_usuario], map: "fk_mov_material_usuarios")
+  @@index([id_material, fecha_movimiento], map: "idx_mov_material_fecha")
+  @@index([tipo_referencia, id_referencia], map: "idx_mov_material_referencia")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model tbl_movimientos_producto {
+  id_movimiento_producto BigInt                                   @id @default(autoincrement()) @db.UnsignedBigInt
+  id_variante            Int                                      @db.UnsignedInt
+  id_usuario             Int                                      @db.UnsignedInt
+  tipo_movimiento        tbl_movimientos_producto_tipo_movimiento
+  cantidad               Int                                      @db.UnsignedInt
+  fecha_movimiento       DateTime                                 @default(now()) @db.DateTime(0)
+  tipo_referencia        tbl_movimientos_producto_tipo_referencia
+  id_referencia          BigInt?                                  @db.UnsignedBigInt
+  observaciones          String?                                  @db.VarChar(500)
+  tbl_usuarios           tbl_usuarios                             @relation(fields: [id_usuario], references: [id_usuario], map: "fk_mov_producto_usuarios")
+  tbl_variantes_producto tbl_variantes_producto                   @relation(fields: [id_variante], references: [id_variante], map: "fk_mov_producto_variantes")
+
+  @@index([id_usuario], map: "fk_mov_producto_usuarios")
+  @@index([id_variante, fecha_movimiento], map: "idx_mov_producto_fecha")
+  @@index([tipo_referencia, id_referencia], map: "idx_mov_producto_referencia")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model tbl_pagos_pedido {
+  id_pago_pedido BigInt                     @id @default(autoincrement()) @db.UnsignedBigInt
+  id_pedido      BigInt                     @db.UnsignedBigInt
+  id_usuario     Int                        @db.UnsignedInt
+  fecha_pago     DateTime                   @default(now()) @db.DateTime(0)
+  monto          Decimal                    @db.Decimal(14, 2)
+  tipo_pago      tbl_pagos_pedido_tipo_pago
+  observaciones  String?                    @db.VarChar(500)
+  tbl_pedidos    tbl_pedidos                @relation(fields: [id_pedido], references: [id_pedido], map: "fk_pagos_pedido_pedidos")
+  tbl_usuarios   tbl_usuarios               @relation(fields: [id_usuario], references: [id_usuario], map: "fk_pagos_pedido_usuarios")
+
+  @@index([id_pedido], map: "fk_pagos_pedido_pedidos")
+  @@index([id_usuario], map: "fk_pagos_pedido_usuarios")
+}
+
+model tbl_pedidos {
+  id_pedido              BigInt                  @id @default(autoincrement()) @db.UnsignedBigInt
+  id_cliente             Int                     @db.UnsignedInt
+  id_usuario             Int                     @db.UnsignedInt
+  fecha_pedido           DateTime                @default(now()) @db.DateTime(0)
+  fecha_estimada_entrega DateTime?               @db.Date
+  precio_total           Decimal                 @default(0.00) @db.Decimal(14, 2)
+  observaciones          String?                 @db.VarChar(500)
+  imagen_referencia      String?                 @db.VarChar(500)
+  estado                 tbl_pedidos_estado      @default(BORRADOR)
+  tbl_detalle_pedido     tbl_detalle_pedido[]
+  tbl_pagos_pedido       tbl_pagos_pedido[]
+  tbl_clientes           tbl_clientes            @relation(fields: [id_cliente], references: [id_cliente], map: "fk_pedidos_clientes")
+  tbl_usuarios           tbl_usuarios            @relation(fields: [id_usuario], references: [id_usuario], map: "fk_pedidos_usuarios")
+  tbl_reservas_producto  tbl_reservas_producto[]
+  tbl_ventas             tbl_ventas?
+
+  @@index([id_cliente], map: "fk_pedidos_clientes")
+  @@index([id_usuario], map: "fk_pedidos_usuarios")
+  @@index([estado], map: "idx_pedidos_estado")
+  @@index([fecha_pedido], map: "idx_pedidos_fecha")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model tbl_producciones {
+  id_produccion        BigInt                  @id @default(autoincrement()) @db.UnsignedBigInt
+  id_detalle_pedido    BigInt                  @unique(map: "uq_produccion_detalle") @db.UnsignedBigInt
+  id_usuario           Int                     @db.UnsignedInt
+  fecha_inicio         DateTime?               @db.DateTime(0)
+  fecha_finalizacion   DateTime?               @db.DateTime(0)
+  cantidad_total       Int                     @db.UnsignedInt
+  cantidad_producida   Int                     @default(0) @db.UnsignedInt
+  estado               tbl_producciones_estado @default(PENDIENTE)
+  observaciones        String?                 @db.VarChar(500)
+  tbl_lotes_produccion tbl_lotes_produccion[]
+  tbl_detalle_pedido   tbl_detalle_pedido      @relation(fields: [id_detalle_pedido], references: [id_detalle_pedido], map: "fk_producciones_detalle_pedido")
+  tbl_usuarios         tbl_usuarios            @relation(fields: [id_usuario], references: [id_usuario], map: "fk_producciones_usuarios")
+
+  @@index([id_usuario], map: "fk_producciones_usuarios")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model tbl_producto_material {
+  id_producto_material   Int                          @id @default(autoincrement()) @db.UnsignedInt
+  id_producto            Int                          @db.UnsignedInt
+  id_material            Int                          @db.UnsignedInt
+  cantidad_por_par       Decimal                      @db.Decimal(14, 4)
+  porcentaje_desperdicio Decimal                      @default(0.00) @db.Decimal(5, 2)
+  estado                 tbl_producto_material_estado @default(ACTIVO)
+  tbl_materiales         tbl_materiales               @relation(fields: [id_material], references: [id_material], map: "fk_producto_material_material")
+  tbl_productos          tbl_productos                @relation(fields: [id_producto], references: [id_producto], map: "fk_producto_material_producto")
+
+  @@unique([id_producto, id_material], map: "uq_producto_material")
+  @@index([id_material], map: "fk_producto_material_material")
+}
+
+model tbl_productos {
+  id_producto            Int                      @id @default(autoincrement()) @db.UnsignedInt
+  nombre                 String                   @unique(map: "uq_productos_nombre") @db.VarChar(120)
+  categoria              String?                  @db.VarChar(50)
+  descripcion            String?                  @db.VarChar(500)
+  imagen_url             String?                  @db.VarChar(500)
+  precio_venta           Decimal                  @default(0.00) @db.Decimal(12, 2)
+  estado                 tbl_productos_estado     @default(ACTIVO)
+  fecha_registro         DateTime                 @default(now()) @db.DateTime(0)
+  tbl_producto_material  tbl_producto_material[]
+  tbl_variantes_producto tbl_variantes_producto[]
+}
+
+model tbl_proveedores {
+  id_proveedor   Int                    @id @default(autoincrement()) @db.UnsignedInt
+  nombre         String                 @db.VarChar(150)
+  contacto       String?                @db.VarChar(150)
+  telefono       String?                @db.VarChar(25)
+  correo         String?                @db.VarChar(150)
+  nit            String?                @db.VarChar(25)
+  direccion      String?                @db.VarChar(255)
+  observaciones  String?                @db.VarChar(500)
+  estado         tbl_proveedores_estado @default(ACTIVO)
+  fecha_registro DateTime               @default(now()) @db.DateTime(0)
+  tbl_compras    tbl_compras[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model tbl_reservas_producto {
+  id_reserva             BigInt                       @id @default(autoincrement()) @db.UnsignedBigInt
+  id_pedido              BigInt                       @db.UnsignedBigInt
+  id_variante            Int                          @db.UnsignedInt
+  cantidad_reservada     Int                          @db.UnsignedInt
+  fecha_reserva          DateTime                     @default(now()) @db.DateTime(0)
+  estado                 tbl_reservas_producto_estado @default(ACTIVA)
+  tbl_pedidos            tbl_pedidos                  @relation(fields: [id_pedido], references: [id_pedido], map: "fk_reservas_pedidos")
+  tbl_variantes_producto tbl_variantes_producto       @relation(fields: [id_variante], references: [id_variante], map: "fk_reservas_variantes")
+
+  @@unique([id_pedido, id_variante], map: "uq_reserva_pedido_variante")
+  @@index([id_variante], map: "fk_reservas_variantes")
+}
+
+model tbl_roles {
+  id_rol       Int              @id @default(autoincrement()) @db.UnsignedInt
+  nombre_rol   String           @unique(map: "uq_roles_nombre") @db.VarChar(50)
+  descripcion  String?          @db.VarChar(255)
+  estado       tbl_roles_estado @default(ACTIVO)
+  tbl_usuarios tbl_usuarios[]
+}
+
+model tbl_unidades_medida {
+  id_unidad      Int              @id @default(autoincrement()) @db.UnsignedInt
+  nombre         String           @unique(map: "uq_unidades_nombre") @db.VarChar(50)
+  abreviatura    String           @unique(map: "uq_unidades_abreviatura") @db.VarChar(10)
+  tbl_materiales tbl_materiales[]
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model tbl_usuarios {
+  id_usuario               Int                        @id @default(autoincrement()) @db.UnsignedInt
+  id_rol                   Int                        @db.UnsignedInt
+  nombre                   String                     @db.VarChar(120)
+  nombre_usuario           String                     @unique(map: "uq_usuarios_nombre_usuario") @db.VarChar(50)
+  contrasena               String                     @db.VarChar(255)
+  estado                   tbl_usuarios_estado        @default(ACTIVO)
+  fecha_creacion           DateTime                   @default(now()) @db.DateTime(0)
+  tbl_abonos               tbl_abonos[]
+  tbl_bitacora             tbl_bitacora[]
+  tbl_compras              tbl_compras[]
+  tbl_movimientos_material tbl_movimientos_material[]
+  tbl_movimientos_producto tbl_movimientos_producto[]
+  tbl_pagos_pedido         tbl_pagos_pedido[]
+  tbl_pedidos              tbl_pedidos[]
+  tbl_producciones         tbl_producciones[]
+  tbl_roles                tbl_roles                  @relation(fields: [id_rol], references: [id_rol], map: "fk_usuarios_roles")
+  tbl_ventas               tbl_ventas[]
+
+  @@index([id_rol], map: "fk_usuarios_roles")
+}
+
+model tbl_variantes_producto {
+  id_variante              Int                           @id @default(autoincrement()) @db.UnsignedInt
+  id_producto              Int                           @db.UnsignedInt
+  talla                    String                        @db.VarChar(15)
+  color                    String                        @db.VarChar(50)
+  material                 String?                       @db.VarChar(120)
+  suela                    String?                       @db.VarChar(100)
+  precio                   Decimal?                      @db.Decimal(12, 2)
+  existencia_actual        Int                           @default(0) @db.UnsignedInt
+  estado                   tbl_variantes_producto_estado @default(ACTIVO)
+  tbl_detalle_pedido       tbl_detalle_pedido[]
+  tbl_detalle_venta        tbl_detalle_venta[]
+  tbl_movimientos_producto tbl_movimientos_producto[]
+  tbl_reservas_producto    tbl_reservas_producto[]
+  tbl_productos            tbl_productos                 @relation(fields: [id_producto], references: [id_producto], map: "fk_variantes_productos")
+
+  @@unique([id_producto, talla, color], map: "uq_variante_producto")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model tbl_ventas {
+  id_venta          BigInt               @id @default(autoincrement()) @db.UnsignedBigInt
+  id_cliente        Int                  @db.UnsignedInt
+  id_pedido         BigInt?              @unique(map: "uq_ventas_pedido") @db.UnsignedBigInt
+  id_usuario        Int                  @db.UnsignedInt
+  fecha_venta       DateTime             @default(now()) @db.DateTime(0)
+  tipo_pago         tbl_ventas_tipo_pago
+  total_venta       Decimal              @default(0.00) @db.Decimal(14, 2)
+  monto_pagado      Decimal              @default(0.00) @db.Decimal(14, 2)
+  saldo_credito     Decimal              @default(0.00) @db.Decimal(14, 2)
+  observaciones     String?              @db.VarChar(500)
+  estado            tbl_ventas_estado    @default(BORRADOR)
+  tbl_creditos      tbl_creditos?
+  tbl_detalle_venta tbl_detalle_venta[]
+  tbl_clientes      tbl_clientes         @relation(fields: [id_cliente], references: [id_cliente], map: "fk_ventas_clientes")
+  tbl_pedidos       tbl_pedidos?         @relation(fields: [id_pedido], references: [id_pedido], onDelete: Restrict, map: "fk_ventas_pedidos")
+  tbl_usuarios      tbl_usuarios         @relation(fields: [id_usuario], references: [id_usuario], map: "fk_ventas_usuarios")
+
+  @@index([id_cliente], map: "fk_ventas_clientes")
+  @@index([id_usuario], map: "fk_ventas_usuarios")
+}
+
+enum tbl_movimientos_material_tipo_movimiento {
+  ENTRADA
+  SALIDA
+  AJUSTE_POSITIVO
+  AJUSTE_NEGATIVO
+}
+
+enum tbl_movimientos_producto_tipo_movimiento {
+  ENTRADA
+  SALIDA
+  AJUSTE_POSITIVO
+  AJUSTE_NEGATIVO
+  RESERVA
+  LIBERACION
+}
+
+enum tbl_roles_estado {
+  ACTIVO
+  INACTIVO
+}
+
+enum tbl_productos_estado {
+  ACTIVO
+  INACTIVO
+}
+
+enum tbl_clientes_estado {
+  ACTIVO
+  INACTIVO
+}
+
+enum tbl_cuotas_credito_estado {
+  PENDIENTE
+  PARCIAL
+  PAGADA
+  VENCIDA
+  ANULADA
+}
+
+enum tbl_pagos_pedido_tipo_pago {
+  ANTICIPO
+  PAGO_PARCIAL
+  LIQUIDACION
+  DEVOLUCION
+}
+
+enum tbl_producto_material_estado {
+  ACTIVO
+  INACTIVO
+}
+
+enum tbl_proveedores_estado {
+  ACTIVO
+  INACTIVO
+}
+
+enum tbl_reservas_producto_estado {
+  ACTIVA
+  UTILIZADA
+  LIBERADA
+  CANCELADA
+}
+
+enum tbl_usuarios_estado {
+  ACTIVO
+  INACTIVO
+  BLOQUEADO
+}
+
+enum tbl_variantes_producto_estado {
+  ACTIVO
+  INACTIVO
+}
+
+enum tbl_ventas_tipo_pago {
+  CONTADO
+  CREDITO
+  MIXTO
+}
+
+enum tbl_compras_estado {
+  PENDIENTE
+  RECIBIDA
+  ANULADA
+}
+
+enum tbl_lotes_produccion_estado {
+  PENDIENTE
+  EN_PROCESO
+  FINALIZADO
+  CANCELADO
+}
+
+enum tbl_movimientos_material_tipo_referencia {
+  COMPRA
+  PRODUCCION
+  AJUSTE
+  DEVOLUCION
+}
+
+enum tbl_movimientos_producto_tipo_referencia {
+  PRODUCCION
+  VENTA
+  RESERVA
+  AJUSTE
+  DEVOLUCION
+}
+
+enum tbl_creditos_estado {
+  ACTIVO
+  PAGADO
+  VENCIDO
+  ANULADO
+}
+
+enum tbl_materiales_estado {
+  ACTIVO
+  INACTIVO
+}
+
+enum tbl_pedidos_estado {
+  BORRADOR
+  CONFIRMADO
+  EN_PRODUCCION
+  LISTO
+  ENTREGADO
+  CANCELADO
+}
+
+enum tbl_producciones_estado {
+  PENDIENTE
+  EN_PROCESO
+  PAUSADA
+  FINALIZADA
+  CANCELADA
+}
+
+enum tbl_ventas_estado {
+  BORRADOR
+  COMPLETADA
+  ANULADA
+}
